@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-import base64, zlib, json, argparse
+import base64, zlib, json, argparse, os
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description="Process XML file and apply coordinate offset.")
@@ -8,7 +8,9 @@ parser.add_argument("-x", type=float, default=0.0, help="Offset to apply to x co
 parser.add_argument("-y", type=float, default=0.0, help="Offset to apply to y coordinates")
 args = parser.parse_args()
 
-tree = ET.parse("place.gmd")
+name = args.xml_file.split(".")[0]
+
+tree = ET.parse(args.xml_file)
 root = tree.getroot()
 
 dict_element = root.find("dict")
@@ -27,7 +29,7 @@ def decode_level(level_data: str, is_official_level: bool) -> str:
 
 def match_float(input_num):
 	if input_num < 0.5 or input_num > 2:
-		ValueError("Invalid scale value. You cannot use scalehack values.")
+		print("Major precision loss. Invalid scale value. You cannot use scalehack values.")
 	
 	mapping = {
 		0.5: 244,
@@ -39,7 +41,7 @@ def match_float(input_num):
 		0.707: 250,
 		0.749: 251,
 		0.794: 252,
-		0.841: 253,
+		0.841: 254,
 		0.891: 254,
 		0.944: 255,
 		1.0: 0,
@@ -158,8 +160,8 @@ for obj in objectString.split(";"):
 		"y_angle": 0,
 		"z_layer": 3,
 		"z_order": 0,
-		"main_colour": allColours[0],
-		"detail_colour": allColours[0]
+		"main_color": allColours[0],
+		"detail_color": allColours[0]
 	}
 
 	# id
@@ -167,8 +169,8 @@ for obj in objectString.split(";"):
 
  	# x and y
 	# round x and y to nearest 0.5
-	returnObj["x"] = round(float(objPairs[2]) * 2) / 2 + args.x_offset
-	returnObj["y"] = round(float(objPairs[3]) * 2) / 2 + args.y_offset
+	returnObj["x"] = round(float(objPairs[2]) * 2) / 2 + args.x
+	returnObj["y"] = round(float(objPairs[3]) * 2) / 2 + args.y
 
 	# scale
 	if 32 in objPairs:
@@ -202,7 +204,7 @@ for obj in objectString.split(";"):
 		objPairs[131] += 180
 
 	if 6 in objPairs:
-		rot = objPairs[6]
+		rot = float(objPairs[6])
 		objPairs[131] += rot
 		objPairs[132] += rot
 
@@ -220,13 +222,17 @@ for obj in objectString.split(";"):
 	# colours
 	if 21 in objPairs:
 		if int(objPairs[21]) in allColours:
-			returnObj["main_colour"] = allColours[int(objPairs[21])]
+			returnObj["main_color"] = allColours[int(objPairs[21])]
 
 	if 22 in objPairs:
 		if int(objPairs[22]) in allColours:
-			returnObj["detail_colour"] = allColours[int(objPairs[22])]
+			returnObj["detail_color"] = allColours[int(objPairs[22])]
 
 	objects.append(returnObj)
 
-with open("level.json", "w") as f:
+os.makedirs("output", exist_ok=True)
+
+name = os.path.basename(name)
+
+with open(f"output/{name}.json", "w") as f:
 	json.dump(objects, f, indent=4)
